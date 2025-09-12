@@ -28,10 +28,10 @@ This folder contains scripts and configuration files that can be used to build a
 ## Quick Start
 To run these models on your Gaudi machine:
 
-1) First, obtain the Dockerfile and benchmark scripts from the Gaudi-tutorials repository using the command below
+1) First, obtain the Dockerfile and benchmark scripts from the vllm-tutorials repository using the command below
 ```bash
-git clone https://github.com/HabanaAI/Gaudi-tutorials
-cd Gaudi-tutorials/PyTorch/vLLM_Tutorials/Deploying_vLLM
+git clone https://github.com/HabanaAI/vllm-tutorials
+cd vllm-tutorials/Deploying_vLLM
 ```
 
 > **IMPORTANT**
