@@ -1,0 +1,1 @@
+{"mode": "QUANTIZE","observer": "maxabs","scale_method": "maxabs_hw","allowlist": {"types": [],"names": []},"blocklist": {"types": [],"names": []},"dump_stats_path": "/root/scripts/measurement/granite-3b-code-instruct-128k_tp1_g3/granite-3b-code-instruct-128k/g3/inc_output"}

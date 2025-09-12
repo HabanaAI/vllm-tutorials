@@ -19,14 +19,14 @@ docker exec -it Gaudi_Docker bash
 The tutorials will cover the following domains and tasks:
 
 ### Advanced
-- [Deploying on vLLM](https://github.com/HabanaAI/Gaudi-tutorials/tree/main/PyTorch/vLLM_Tutorials/Deploying_vLLM)
+- [Deploying on vLLM](https://github.com/HabanaAI/vllm-tutorials/tree/main//Deploying_vLLM)
 
 ### Intermediate
-- [Benchmarking on vLLM](http://localhost:9010/lab/tree/Gaudi-tutorials/PyTorch/vLLM_Tutorials/Benchmarking_on_vLLM/vLLM_Benchmark_Serving.ipynb)
+- [Benchmarking on vLLM](http://localhost:9010/lab/tree/vllm-tutorials//Benchmarking_on_vLLM/vLLM_Benchmark_Serving.ipynb)
 
 ### Getting Started
-- [Getting Started with vLLM](https://github.com/HabanaAI/Gaudi-tutorials/blob/main/PyTorch/vLLM_Tutorials/Getting_Started_with_vLLM/Getting_Started_with_vLLM.ipynb)
-- [Understanding vLLM on Gaudi](https://github.com/HabanaAI/Gaudi-tutorials/blob/main/PyTorch/vLLM_Tutorials/Understanding_vLLM_on_Gaudi/Understanding_vLLM_on_Gaudi.ipynb)
+- [Getting Started with vLLM](https://github.com/HabanaAI/vllm-tutorials/blob/main//Getting_Started_with_vLLM/Getting_Started_with_vLLM.ipynb)
+- [Understanding vLLM on Gaudi](https://github.com/HabanaAI/vllm-tutorials/blob/main//Understanding_vLLM_on_Gaudi/Understanding_vLLM_on_Gaudi.ipynb)
 
 ## DISCLAIMER
 Intel is committed to the respect of human rights and avoiding complicity in human rights abuses, a policy reflected in the Intel Global Human Rights Principles. Accordingly, by accessing the Intel material on this platform you agree that you will not use the material in a product or application that causes or contributes to a violation of an internationally recognized human right.
