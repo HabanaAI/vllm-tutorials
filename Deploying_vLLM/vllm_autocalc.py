@@ -107,7 +107,7 @@ def vllm_auto_calc(fd):
     fd['KVCACHE_MEM_EST'] = fd['USABLE_MEM'] * fd['GPU_MEMORY_UTILIZATION']
     fd['KVCACHE_PARALLEL'] = 1 if fd['KV_LORA_RANK'] else min(fd['TENSOR_PARALLEL_SIZE'], fd['NUM_KEY_VALUE_HEADS']) 
     if fd.get('MAX_NUM_SEQS') is None:
-        fd['EST_MAX_NUM_SEQS'] = fd['MAX_NUM_SEQS_P90_CONFIG'] if fd['MAX_NUM_SEQS_P90_CONFIG'] else \
+        fd['EST_MAX_NUM_SEQS'] = fd['MAX_NUM_SEQS_CONFIG'] if fd['MAX_NUM_SEQS_CONFIG'] else \
                                 fd['KVCACHE_MEM_EST'] / (fd['KV_CACHE_PER_SEQ'] / fd['KVCACHE_PARALLEL'])
     else:
         fd['EST_MAX_NUM_SEQS'] = max(1, fd['MAX_NUM_SEQS'])
@@ -204,7 +204,7 @@ def vllm_auto_calc(fd):
                                     min(fd['TENSOR_PARALLEL_SIZE'], fd['NUM_KEY_VALUE_HEADS'])
                                     )
                                     )
-        fd['MAX_NUM_SEQS'] = fd['MAX_NUM_SEQS_P90_CONFIG'] if fd['MAX_NUM_SEQS_P90_CONFIG'] else rr
+        fd['MAX_NUM_SEQS'] = fd['MAX_NUM_SEQS_CONFIG'] if fd['MAX_NUM_SEQS_CONFIG'] else rr
         if DTYPE == 'fp8':
             fd['MAX_NUM_SEQS'] = (max(
                 1,
