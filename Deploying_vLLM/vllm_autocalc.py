@@ -86,7 +86,6 @@ def vllm_auto_calc(fd):
     fd['KV_CACHE_PER_SEQ'] = fd['KV_CACHE_PER_SEQ_BYTES'] / 1024 / 1024 / 1024
 
     kv_cache_per_seq_limit = fd['KV_CACHE_PER_SEQ'] * fd['LIMIT_MODEL_LEN'] / fd['MAX_MODEL_LEN']
-    # dd = min(fd['TENSOR_PARALLEL_SIZE'], fd['NUM_KEY_VALUE_HEADS'])
     fd['KVCACHE_PARALLEL'] = 1 if fd['KV_LORA_RANK'] else min(fd['TENSOR_PARALLEL_SIZE'], fd['NUM_KEY_VALUE_HEADS'])
     fd['MAX_NUM_BATCHED_TOKEN'] = ((kv_cache_per_seq_limit if fd['SAVE_RECIPE_CACHE'] else fd['KV_CACHE_PER_SEQ']) /
                                     fd['KVCACHE_PARALLEL'])
@@ -106,7 +105,6 @@ def vllm_auto_calc(fd):
                                         (1 - fd['GPU_FREE_MEM_TARGET'] / fd['USABLE_MEM']) 
                                         * 100) / 100
     fd['KVCACHE_MEM_EST'] = fd['USABLE_MEM'] * fd['GPU_MEMORY_UTILIZATION']
-    # fd['KVCACHE_PARALLEL'] = 1 if fd['KV_LORA_RANK'] else min(fd['TENSOR_PARALLEL_SIZE'], fd['NUM_KEY_VALUE_HEADS']) 
     if fd.get('MAX_NUM_SEQS') is None:
         fd['EST_MAX_NUM_SEQS'] = fd['MAX_NUM_SEQS_CONFIG'] if fd['MAX_NUM_SEQS_CONFIG'] else \
                                 fd['KVCACHE_MEM_EST'] / (fd['KV_CACHE_PER_SEQ'] / fd['KVCACHE_PARALLEL'])
@@ -159,10 +157,10 @@ def vllm_auto_calc(fd):
                             2))
     fd['PROMPT_BS_RAMP_GRAPHS'] = prompt_bs_ramp_graphs_exp if fd['VLLM_EXPONENTIAL_BUCKETING'] else prompt_bs_ramp_graphs_lin 
 
-    mm =  max(0, int(1 + 
+    prompt_bs_step_graphs_lin =  max(0, int(1 + 
                         (fd['MAX_NUM_PREFILL_SEQS'] - fd['VLLM_PROMPT_BS_BUCKET_STEP']) / 
                         fd['VLLM_PROMPT_BS_BUCKET_STEP']))
-    fd['PROMPT_BS_STEP_GRAPHS'] = 0 if fd['VLLM_EXPONENTIAL_BUCKETING'] else mm
+    fd['PROMPT_BS_STEP_GRAPHS'] = 0 if fd['VLLM_EXPONENTIAL_BUCKETING'] else prompt_bs_step_graphs_lin
 
     prompt_seq_ramp_graphs_exp = 1 + math.ceil(math.log(
                                 fd['MAX_MODEL_LEN'], 
