@@ -79,20 +79,21 @@ def vllm_auto_calc(fd):
     fd['KV_SIZE'] = fd['HEAD_DIM'] * fd['NUM_KEY_VALUE_HEADS'] if fd['HEAD_DIM'] else \
                     fd['HIDDEN_SIZE'] * fd['NUM_KEY_VALUE_HEADS'] / fd['NUM_ATTENTION_HEADS']
     
-    aa = fd['MAX_MODEL_LEN'] * fd['NUM_HIDDEN_LAYERS'] * (fd['KV_LORA_RANK'] + fd['QK_ROPE_HEAD_DIM']) * \
+    kv_cache_per_seq_bytes_mla = fd['MAX_MODEL_LEN'] * fd['NUM_HIDDEN_LAYERS'] * (fd['KV_LORA_RANK'] + fd['QK_ROPE_HEAD_DIM']) * \
         fd['CACHE_DTYPE_BYTES']
-    bb = 2 * fd['MAX_MODEL_LEN'] * fd['NUM_HIDDEN_LAYERS'] * fd['KV_SIZE'] * fd['CACHE_DTYPE_BYTES']
-    fd['KV_CACHE_PER_SEQ_BYTES'] = aa if fd['KV_LORA_RANK'] else bb
+    kv_cache_per_seq_bytes_gqa = 2 * fd['MAX_MODEL_LEN'] * fd['NUM_HIDDEN_LAYERS'] * fd['KV_SIZE'] * fd['CACHE_DTYPE_BYTES']
+    fd['KV_CACHE_PER_SEQ_BYTES'] = kv_cache_per_seq_bytes_mla if fd['KV_LORA_RANK'] else kv_cache_per_seq_bytes_gqa
     fd['KV_CACHE_PER_SEQ'] = fd['KV_CACHE_PER_SEQ_BYTES'] / 1024 / 1024 / 1024
 
-    cc = fd['KV_CACHE_PER_SEQ'] * fd['LIMIT_MODEL_LEN'] / fd['MAX_MODEL_LEN']
-    dd = min(fd['TENSOR_PARALLEL_SIZE'], fd['NUM_KEY_VALUE_HEADS'])
-    fd['MAX_NUM_BATCHED_TOKEN'] = ((cc if fd['SAVE_RECIPE_CACHE'] else fd['KV_CACHE_PER_SEQ']) /
-                                    (1 if fd['KV_LORA_RANK'] else dd))
+    kv_cache_per_seq_limit = fd['KV_CACHE_PER_SEQ'] * fd['LIMIT_MODEL_LEN'] / fd['MAX_MODEL_LEN']
+    # dd = min(fd['TENSOR_PARALLEL_SIZE'], fd['NUM_KEY_VALUE_HEADS'])
+    fd['KVCACHE_PARALLEL'] = 1 if fd['KV_LORA_RANK'] else min(fd['TENSOR_PARALLEL_SIZE'], fd['NUM_KEY_VALUE_HEADS'])
+    fd['MAX_NUM_BATCHED_TOKEN'] = ((kv_cache_per_seq_limit if fd['SAVE_RECIPE_CACHE'] else fd['KV_CACHE_PER_SEQ']) /
+                                    fd['KVCACHE_PARALLEL'])
     fd['USABLE_MEM'] = ((fd['TOTAL_GPU_MEM'] / fd['TENSOR_PARALLEL_SIZE']) -
                         fd['UNAVAILABLE_MEM_ABS'] -
                         (fd['MODEL_MEM_IN_GB'] / fd['TENSOR_PARALLEL_SIZE']) -
-                        fd['MAX_NUM_BATCHED_TOKEN'])                    
+                        fd['MAX_NUM_BATCHED_TOKEN'])
     if fd['USABLE_MEM'] < 0:
         raise ValueError(
             f"Not enough memory for MODEL '{os.environ['MODEL']}', "
@@ -105,7 +106,7 @@ def vllm_auto_calc(fd):
                                         (1 - fd['GPU_FREE_MEM_TARGET'] / fd['USABLE_MEM']) 
                                         * 100) / 100
     fd['KVCACHE_MEM_EST'] = fd['USABLE_MEM'] * fd['GPU_MEMORY_UTILIZATION']
-    fd['KVCACHE_PARALLEL'] = 1 if fd['KV_LORA_RANK'] else min(fd['TENSOR_PARALLEL_SIZE'], fd['NUM_KEY_VALUE_HEADS']) 
+    # fd['KVCACHE_PARALLEL'] = 1 if fd['KV_LORA_RANK'] else min(fd['TENSOR_PARALLEL_SIZE'], fd['NUM_KEY_VALUE_HEADS']) 
     if fd.get('MAX_NUM_SEQS') is None:
         fd['EST_MAX_NUM_SEQS'] = fd['MAX_NUM_SEQS_CONFIG'] if fd['MAX_NUM_SEQS_CONFIG'] else \
                                 fd['KVCACHE_MEM_EST'] / (fd['KV_CACHE_PER_SEQ'] / fd['KVCACHE_PARALLEL'])
@@ -126,55 +127,55 @@ def vllm_auto_calc(fd):
     else:
         fd['EST_HPU_BLOCKS'] = fd['NUM_GPU_BLOCKS_OVERRIDE']
 
-    ee = 1 + math.ceil(math.log(fd['EST_MAX_NUM_SEQS'], 2))
-    ff = 1 + int(math.log(
+    decode_bs_ramp_graphs_exp = 1 + math.ceil(math.log(fd['EST_MAX_NUM_SEQS'], 2))
+    decode_bs_ramp_graphs_lin = 1 + int(math.log(
                         fd['VLLM_DECODE_BS_BUCKET_STEP'] / fd['VLLM_DECODE_BS_BUCKET_MIN'], 
                         2))
-    fd['DECODE_BS_RAMP_GRAPHS'] = ee if fd['VLLM_EXPONENTIAL_BUCKETING'] else ff
+    fd['DECODE_BS_RAMP_GRAPHS'] = decode_bs_ramp_graphs_exp if fd['VLLM_EXPONENTIAL_BUCKETING'] else decode_bs_ramp_graphs_lin
 
-    gg = max(0, int(1 + (fd['EST_MAX_NUM_SEQS'] - fd['VLLM_DECODE_BS_BUCKET_STEP']) / 
+    decode_bs_step_graphs_lin = max(0, int(1 + (fd['EST_MAX_NUM_SEQS'] - fd['VLLM_DECODE_BS_BUCKET_STEP']) / 
             fd['VLLM_DECODE_BS_BUCKET_STEP']))
-    fd['DECODE_BS_STEP_GRAPHS'] = 0 if fd['VLLM_EXPONENTIAL_BUCKETING'] else gg
+    fd['DECODE_BS_STEP_GRAPHS'] = 0 if fd['VLLM_EXPONENTIAL_BUCKETING'] else decode_bs_step_graphs_lin
 
-    hh = 1 + math.ceil(math.log(fd['EST_HPU_BLOCKS'], 2))
-    ii = 1 + int(math.log(
+    decode_block_ramp_graphs_exp = 1 + math.ceil(math.log(fd['EST_HPU_BLOCKS'], 2))
+    decode_block_ramp_graphs_lin = 1 + int(math.log(
                         fd['VLLM_DECODE_BLOCK_BUCKET_STEP'] / fd['VLLM_DECODE_BLOCK_BUCKET_MIN'], 
                         2))
-    fd['DECODE_BLOCK_RAMP_GRAPHS'] = hh if fd['VLLM_EXPONENTIAL_BUCKETING'] else ii
+    fd['DECODE_BLOCK_RAMP_GRAPHS'] = decode_block_ramp_graphs_exp if fd['VLLM_EXPONENTIAL_BUCKETING'] else decode_block_ramp_graphs_lin
 
-    jj = max(0, int(1 + 
+    decode_block_step_graphs_lin = max(0, int(1 + 
                     (fd['EST_HPU_BLOCKS'] - fd['VLLM_DECODE_BLOCK_BUCKET_STEP']) / 
                     fd['VLLM_DECODE_BLOCK_BUCKET_STEP']))
-    fd['DECODE_BLOCK_STEP_GRAPHS'] = 0 if fd['VLLM_EXPONENTIAL_BUCKETING'] else jj
+    fd['DECODE_BLOCK_STEP_GRAPHS'] = 0 if fd['VLLM_EXPONENTIAL_BUCKETING'] else decode_block_step_graphs_lin
     
     fd['NUM_DECODE_GRAPHS'] = (
         (fd['DECODE_BS_RAMP_GRAPHS'] + fd['DECODE_BS_STEP_GRAPHS']) *
         (fd['DECODE_BLOCK_RAMP_GRAPHS'] + fd['DECODE_BLOCK_STEP_GRAPHS']))
 
-    kk = 1 + math.ceil(math.log(fd['MAX_NUM_PREFILL_SEQS'], 2))
-    ll = 1 + int(math.log(
+    prompt_bs_ramp_graphs_exp = 1 + math.ceil(math.log(fd['MAX_NUM_PREFILL_SEQS'], 2))
+    prompt_bs_ramp_graphs_lin = 1 + int(math.log(
                         min(fd['MAX_NUM_PREFILL_SEQS'], fd['VLLM_PROMPT_BS_BUCKET_STEP']) / 
                             fd['VLLM_PROMPT_BS_BUCKET_MIN'], 
                             2))
-    fd['PROMPT_BS_RAMP_GRAPHS'] = kk if fd['VLLM_EXPONENTIAL_BUCKETING'] else ll 
+    fd['PROMPT_BS_RAMP_GRAPHS'] = prompt_bs_ramp_graphs_exp if fd['VLLM_EXPONENTIAL_BUCKETING'] else prompt_bs_ramp_graphs_lin 
 
     mm =  max(0, int(1 + 
                         (fd['MAX_NUM_PREFILL_SEQS'] - fd['VLLM_PROMPT_BS_BUCKET_STEP']) / 
                         fd['VLLM_PROMPT_BS_BUCKET_STEP']))
     fd['PROMPT_BS_STEP_GRAPHS'] = 0 if fd['VLLM_EXPONENTIAL_BUCKETING'] else mm
 
-    nn = 1 + math.ceil(math.log(
+    prompt_seq_ramp_graphs_exp = 1 + math.ceil(math.log(
                                 fd['MAX_MODEL_LEN'], 
                                 2))
-    oo = 1 + int(math.log(
+    prompt_seq_ramp_graphs_lin = 1 + int(math.log(
                         fd['VLLM_PROMPT_SEQ_BUCKET_STEP'] / 
                         fd['VLLM_PROMPT_SEQ_BUCKET_MIN'], 
                         2))
-    fd['PROMPT_SEQ_RAMP_GRAPHS'] = nn if fd['VLLM_EXPONENTIAL_BUCKETING'] else oo
+    fd['PROMPT_SEQ_RAMP_GRAPHS'] = prompt_seq_ramp_graphs_exp if fd['VLLM_EXPONENTIAL_BUCKETING'] else prompt_seq_ramp_graphs_lin
 
-    pp = int(1 + ((fd['MAX_MODEL_LEN'] - fd['VLLM_PROMPT_SEQ_BUCKET_STEP']) / 
+    prompt_seq_step_graphs_lin = int(1 + ((fd['MAX_MODEL_LEN'] - fd['VLLM_PROMPT_SEQ_BUCKET_STEP']) / 
                     fd['VLLM_PROMPT_SEQ_BUCKET_STEP']))
-    fd['PROMPT_SEQ_STEP_GRAPHS'] = 0 if fd['VLLM_EXPONENTIAL_BUCKETING'] else pp
+    fd['PROMPT_SEQ_STEP_GRAPHS'] = 0 if fd['VLLM_EXPONENTIAL_BUCKETING'] else prompt_seq_step_graphs_lin
     
     fd['EST_NUM_PROMPT_GRAPHS'] = (
         (fd['PROMPT_BS_RAMP_GRAPHS'] + fd['PROMPT_BS_STEP_GRAPHS']) *
@@ -199,12 +200,8 @@ def vllm_auto_calc(fd):
                           (1 - fd['VLLM_GRAPH_RESERVED_MEM']))
 
     if fd.get('MAX_NUM_SEQS') is None:
-        rr = fd['KV_CACHE_MEM'] / (fd['KV_CACHE_PER_SEQ'] / 
-                                    (1 if fd['KV_LORA_RANK'] else 
-                                    min(fd['TENSOR_PARALLEL_SIZE'], fd['NUM_KEY_VALUE_HEADS'])
-                                    )
-                                    )
-        fd['MAX_NUM_SEQS'] = fd['MAX_NUM_SEQS_CONFIG'] if fd['MAX_NUM_SEQS_CONFIG'] else rr
+        max_num_seqs_calc = fd['KV_CACHE_MEM'] / (fd['KV_CACHE_PER_SEQ'] / fd['KVCACHE_PARALLEL'])
+        fd['MAX_NUM_SEQS'] = fd['MAX_NUM_SEQS_CONFIG'] if fd['MAX_NUM_SEQS_CONFIG'] else max_num_seqs_calc
         if DTYPE == 'fp8':
             fd['MAX_NUM_SEQS'] = (max(
                 1,
@@ -220,8 +217,10 @@ def vllm_auto_calc(fd):
             raise ValueError(
                 "Not enough memory for kv cache increase TENSOR_PARALLEL_SIZE "
                 "or reduce MAX_MODEL_LEN or increase bucket step")
-
-        if (fd['MODEL'] in [
+    else:
+        fd['MAX_NUM_SEQS'] = max(1, fd['MAX_NUM_SEQS'])
+    
+    if (fd['MODEL'] in [
                 'meta-llama/Llama-3.2-11B-Vision-Instruct',
                 'meta-llama/Llama-3.2-90B-Vision-Instruct'
         ] and fd['MAX_NUM_SEQS'] > 128):
@@ -229,9 +228,7 @@ def vllm_auto_calc(fd):
             print(f"{fd['MODEL']} currently does not support "
                   "max-num-seqs > 128. "
                   "Limiting max-num-seqs to 128")
-        print("Setting MAX_NUM_SEQS", fd['MAX_NUM_SEQS'])
-    else:
-        fd['MAX_NUM_SEQS'] = max(1, fd['MAX_NUM_SEQS'])
+            print("Setting MAX_NUM_SEQS", fd['MAX_NUM_SEQS'])
 
     fd['VLLM_DECODE_BLOCK_BUCKET_MAX'] = max(
         128, math.ceil((fd['MAX_NUM_SEQS'] * fd['MAX_MODEL_LEN']) / 128))
@@ -354,12 +351,12 @@ def main():
         if fd['MAX_MODEL_LEN_CONFIG'] != 0:
             print('\nRecipe Calc - 1st Iteration *******************')
             fd['MAX_MODEL_LEN'] = fd['MAX_MODEL_LEN_CONFIG']
-            fd['MAX_NUM_SEQS_P90_CONFIG'] = 0
+            fd['MAX_NUM_SEQS_CONFIG'] = 0
             output_dict = vllm_auto_calc(fd)
             print('\nRecipe Calc - 2nd Iteration *******************')
             fd = get_model_from_csv(file_input_csv)
             fd = overwrite_params(fd)
-            fd['MAX_NUM_SEQS_P90_CONFIG'] = output_dict['MAX_NUM_SEQS']
+            fd['MAX_NUM_SEQS_CONFIG'] = output_dict['MAX_NUM_SEQS']
             output_dict = vllm_auto_calc(fd)
         else:
             print('\nRecipe Calc - 1st Iteration *******************')
