@@ -22,13 +22,6 @@ def prepare_group_list(grouping_string):
     return group_list
 
 def vllm_auto_calc(fd):
-    # handle exceptions
-    if (fd['MODEL'] in [
-        'Qwen/Qwen2.5-32B-Instruct'
-    ] and DTYPE == "fp8"
-    and hpu_determined == "GAUDI2"):
-        fd['GPU_FREE_MEM_TARGET'] = 3
-    
     if DTYPE == "fp8":
         fd['QUANT_DTYPE'] = 1
         fd['CACHE_DTYPE_BYTES'] = fd['CACHE_DTYPE_BYTES_FP8']
@@ -80,19 +73,19 @@ def vllm_auto_calc(fd):
                     fd['HIDDEN_SIZE'] * fd['NUM_KEY_VALUE_HEADS'] / fd['NUM_ATTENTION_HEADS']
     
     kv_cache_per_seq_bytes_mla = fd['MAX_MODEL_LEN'] * fd['NUM_HIDDEN_LAYERS'] * (fd['KV_LORA_RANK'] + fd['QK_ROPE_HEAD_DIM']) * \
-        fd['CACHE_DTYPE_BYTES']
+                                fd['CACHE_DTYPE_BYTES']
     kv_cache_per_seq_bytes_gqa = 2 * fd['MAX_MODEL_LEN'] * fd['NUM_HIDDEN_LAYERS'] * fd['KV_SIZE'] * fd['CACHE_DTYPE_BYTES']
     fd['KV_CACHE_PER_SEQ_BYTES'] = kv_cache_per_seq_bytes_mla if fd['KV_LORA_RANK'] else kv_cache_per_seq_bytes_gqa
     fd['KV_CACHE_PER_SEQ'] = fd['KV_CACHE_PER_SEQ_BYTES'] / 1024 / 1024 / 1024
 
     kv_cache_per_seq_limit = fd['KV_CACHE_PER_SEQ'] * fd['LIMIT_MODEL_LEN'] / fd['MAX_MODEL_LEN']
     fd['KVCACHE_PARALLEL'] = 1 if fd['KV_LORA_RANK'] else min(fd['TENSOR_PARALLEL_SIZE'], fd['NUM_KEY_VALUE_HEADS'])
-    fd['MAX_NUM_BATCHED_TOKEN'] = ((kv_cache_per_seq_limit if fd['SAVE_RECIPE_CACHE'] else fd['KV_CACHE_PER_SEQ']) /
+    fd['MEM_MAX_NUM_BATCHED_TOKEN'] = ((kv_cache_per_seq_limit if fd['SAVE_RECIPE_CACHE'] else fd['KV_CACHE_PER_SEQ']) /
                                     fd['KVCACHE_PARALLEL'])
     fd['USABLE_MEM'] = ((fd['TOTAL_GPU_MEM'] / fd['TENSOR_PARALLEL_SIZE']) -
                         fd['UNAVAILABLE_MEM_ABS'] -
                         (fd['MODEL_MEM_IN_GB'] / fd['TENSOR_PARALLEL_SIZE']) -
-                        fd['MAX_NUM_BATCHED_TOKEN'])
+                        fd['MEM_MAX_NUM_BATCHED_TOKEN'])
     if fd['USABLE_MEM'] < 0:
         raise ValueError(
             f"Not enough memory for MODEL '{os.environ['MODEL']}', "
@@ -106,8 +99,7 @@ def vllm_auto_calc(fd):
                                         * 100) / 100
     fd['KVCACHE_MEM_EST'] = fd['USABLE_MEM'] * fd['GPU_MEMORY_UTILIZATION']
     if fd.get('MAX_NUM_SEQS') is None:
-        fd['EST_MAX_NUM_SEQS'] = fd['MAX_NUM_SEQS_CONFIG'] if fd['MAX_NUM_SEQS_CONFIG'] else \
-                                fd['KVCACHE_MEM_EST'] / (fd['KV_CACHE_PER_SEQ'] / fd['KVCACHE_PARALLEL'])
+        fd['EST_MAX_NUM_SEQS'] = fd['KVCACHE_MEM_EST'] / (fd['KV_CACHE_PER_SEQ'] / fd['KVCACHE_PARALLEL'])
     else:
         fd['EST_MAX_NUM_SEQS'] = max(1, fd['MAX_NUM_SEQS'])
 
@@ -199,7 +191,7 @@ def vllm_auto_calc(fd):
 
     if fd.get('MAX_NUM_SEQS') is None:
         max_num_seqs_calc = fd['KV_CACHE_MEM'] / (fd['KV_CACHE_PER_SEQ'] / fd['KVCACHE_PARALLEL'])
-        fd['MAX_NUM_SEQS'] = fd['MAX_NUM_SEQS_CONFIG'] if fd['MAX_NUM_SEQS_CONFIG'] else max_num_seqs_calc
+        fd['MAX_NUM_SEQS'] = max_num_seqs_calc
         if DTYPE == 'fp8':
             fd['MAX_NUM_SEQS'] = (max(
                 1,
@@ -349,12 +341,12 @@ def main():
         if fd['MAX_MODEL_LEN_CONFIG'] != 0:
             print('\nRecipe Calc - 1st Iteration *******************')
             fd['MAX_MODEL_LEN'] = fd['MAX_MODEL_LEN_CONFIG']
-            fd['MAX_NUM_SEQS_CONFIG'] = 0
+            fd['MAX_NUM_SEQS'] = None
             output_dict = vllm_auto_calc(fd)
             print('\nRecipe Calc - 2nd Iteration *******************')
             fd = get_model_from_csv(file_input_csv)
             fd = overwrite_params(fd)
-            fd['MAX_NUM_SEQS_CONFIG'] = output_dict['MAX_NUM_SEQS']
+            fd['MAX_NUM_SEQS'] = output_dict['MAX_NUM_SEQS']
             output_dict = vllm_auto_calc(fd)
         else:
             print('\nRecipe Calc - 1st Iteration *******************')

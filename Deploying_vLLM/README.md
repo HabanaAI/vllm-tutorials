@@ -508,7 +508,7 @@ docker exec -it vllm-server bash
 ```
 
 # Advance Use Case.
-1) You can set the custom concurrent requests (max_num_seq) by passing export **MAX_NUM_SEQS_CONFIG** through the command:
+1) You can set the custom concurrent requests (max_num_seq) by passing export **MAX_NUM_SEQS** through the command:
 ```
 docker run -it --rm \
     -e http_proxy=$http_proxy -e https_proxy=$https_proxy -e no_proxy=$no_proxy \
@@ -524,14 +524,14 @@ docker run -it --rm \
 	-e DTYPE=bfloat16 \
 	-e VLLM_SKIP_WARMUP=true \
     -e MAX_MODEL_LEN=8448 \
-	-e MAX_NUM_SEQS_CONFIG=160 \
+	-e MAX_NUM_SEQS=160 \
 	-e TENSOR_PARALLEL_SIZE=1 \
     --name vllm-server \
     vllm-v0.7.2-gaudi-ub24:1.21.1-16
 ```
 > **IMPORTANT**
 >     
-> You can set **MAX_NUM_SEQS_CONFIG** down till the calculated **MAX_NUM_SEQS** according to given **MAX_MODEL_LEN**.
+> You can set **MAX_NUM_SEQS** down till the calculated **MAX_NUM_SEQS** according to given **MAX_MODEL_LEN**.
 > Not below that.
 >
 
