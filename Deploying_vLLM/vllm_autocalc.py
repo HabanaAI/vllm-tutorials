@@ -3,6 +3,7 @@
 
 import math
 import os
+import copy
 
 import pandas as pd
 
@@ -209,6 +210,7 @@ def vllm_auto_calc(fd):
                 "or reduce MAX_MODEL_LEN or increase bucket step")
     else:
         fd['MAX_NUM_SEQS'] = max(1, fd['MAX_NUM_SEQS'])
+    print("Setting MAX_NUM_SEQS", fd['MAX_NUM_SEQS'])
     
     if (fd['MODEL'] in [
                 'meta-llama/Llama-3.2-11B-Vision-Instruct',
@@ -218,7 +220,6 @@ def vllm_auto_calc(fd):
             print(f"{fd['MODEL']} currently does not support "
                   "max-num-seqs > 128. "
                   "Limiting max-num-seqs to 128")
-            print("Setting MAX_NUM_SEQS", fd['MAX_NUM_SEQS'])
 
     fd['VLLM_DECODE_BLOCK_BUCKET_MAX'] = max(
         128, math.ceil((fd['MAX_NUM_SEQS'] * fd['MAX_MODEL_LEN']) / 128))
@@ -229,11 +230,9 @@ def vllm_auto_calc(fd):
     elif hpu_determined == "GAUDI3":
         fd["gnum"]='g3'
 
-    # DEBUG ******************************
     df = pd.DataFrame(list(fd.items()), columns=['Param', 'Value'])
     pd.set_option('display.max_rows', None)
     print(df)
-    # ************************************
 
     # Create our output list
     with open('varlist_output.txt') as ovp_file:
@@ -337,20 +336,14 @@ def main():
 
     # Overwrite params then perform autocalc
     fd = overwrite_params(fd)
+    fd_copy = copy.deepcopy(fd)
     try:
         if fd['MAX_MODEL_LEN_CONFIG'] != 0:
-            print('\nRecipe Calc - 1st Iteration *******************')
             fd['MAX_MODEL_LEN'] = fd['MAX_MODEL_LEN_CONFIG']
             fd['MAX_NUM_SEQS'] = None
             output_dict = vllm_auto_calc(fd)
-            print('\nRecipe Calc - 2nd Iteration *******************')
-            fd = get_model_from_csv(file_input_csv)
-            fd = overwrite_params(fd)
-            fd['MAX_NUM_SEQS'] = output_dict['MAX_NUM_SEQS']
-            output_dict = vllm_auto_calc(fd)
-        else:
-            print('\nRecipe Calc - 1st Iteration *******************')
-            output_dict = vllm_auto_calc(fd)
+            fd_copy['MAX_NUM_SEQS'] = output_dict['MAX_NUM_SEQS']
+        output_dict = vllm_auto_calc(fd_copy)
 
     except ValueError as e:
         print("Error:", e)

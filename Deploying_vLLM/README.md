@@ -529,11 +529,6 @@ docker run -it --rm \
     --name vllm-server \
     vllm-v0.7.2-gaudi-ub24:1.21.1-16
 ```
-> **IMPORTANT**
->     
-> You can set **MAX_NUM_SEQS** down till the calculated **MAX_NUM_SEQS** according to given **MAX_MODEL_LEN**.
-> Not below that.
->
 
 2) Similarly you can also set custom max_model_len by  passing export **MAX_MODEL_LEN_CONFIG** to run small config(ISL+OSL) in higher context(MAX_MODEL_LEN).
 ```
