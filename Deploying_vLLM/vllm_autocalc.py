@@ -336,14 +336,14 @@ def main():
 
     # Overwrite params then perform autocalc
     fd = overwrite_params(fd)
-    fd_copy = copy.deepcopy(fd)
     try:
         if fd['MAX_MODEL_LEN_CONFIG'] != 0:
-            fd['MAX_MODEL_LEN'] = fd['MAX_MODEL_LEN_CONFIG']
-            fd['MAX_NUM_SEQS'] = None
-            output_dict = vllm_auto_calc(fd)
-            fd_copy['MAX_NUM_SEQS'] = output_dict['MAX_NUM_SEQS']
-        output_dict = vllm_auto_calc(fd_copy)
+            fd_copy = copy.deepcopy(fd)
+            fd_copy['MAX_MODEL_LEN'] = fd['MAX_MODEL_LEN_CONFIG']
+            fd_copy['MAX_NUM_SEQS'] = None
+            output_dict = vllm_auto_calc(fd_copy)
+            fd['MAX_NUM_SEQS'] = output_dict['MAX_NUM_SEQS']
+        output_dict = vllm_auto_calc(fd)
 
     except ValueError as e:
         print("Error:", e)
