@@ -507,30 +507,8 @@ docker exec -it vllm-server bash
 ## It should now start with the warmup cache
 ```
 
-# Advance Use Case.
-1) You can set the custom concurrent requests (max_num_seq) by passing export **MAX_NUM_SEQS** through the command:
-```
-docker run -it --rm \
-    -e http_proxy=$http_proxy -e https_proxy=$https_proxy -e no_proxy=$no_proxy \
-    -e HF_HOME=/mnt/hf_cache \
-    -v /mnt/hf_cache:/mnt/hf_cache \
-    --cap-add=sys_nice \
-    --ipc=host \
-    --runtime=habana \
-    -e HF_TOKEN=YOUR_TOKEN_HERE \
-    -e HABANA_VISIBLE_DEVICES=all \
-    -p 1000:8000 \
-    -e MODEL=meta-llama/Llama-3.1-8B-Instruct \
-	-e DTYPE=bfloat16 \
-	-e VLLM_SKIP_WARMUP=true \
-    -e MAX_MODEL_LEN=8448 \
-	-e MAX_NUM_SEQS=160 \
-	-e TENSOR_PARALLEL_SIZE=1 \
-    --name vllm-server \
-    vllm-v0.7.2-gaudi-ub24:1.21.1-16
-```
-
-2) Similarly you can also set custom max_model_len by  passing export **MAX_MODEL_LEN_CONFIG** to run small config(ISL+OSL) in higher context(MAX_MODEL_LEN).
+# Advance User Notes
+1) MAX_MODEL_LEN defines the maximum posible ISL+OSL configuration the vLLM server can support. If the popular usage configuration (ISL+OSL) is less than the MAX_MODEL_LEN, an optimal vLLM server, which will allow a higher user concurrency, can be brought by passing a (non-vllm) parameter **MAX_MODEL_LEN_CONFIG**=popular(ISL+OSL).    
 ```
 docker run -it --rm \
     -e http_proxy=$http_proxy -e https_proxy=$https_proxy -e no_proxy=$no_proxy \
@@ -552,8 +530,31 @@ docker run -it --rm \
     vllm-v0.7.2-gaudi-ub24:1.21.1-16
 ```
 
-> **IMPORTANT**
+>[!NOTE]
 >     
-> You can set **MAX_MODEL_LEN_CONFIG** upto the given **MAX_MODEL_LEN**.
-> Not more than that.
+> **MAX_MODEL_LEN_CONFIG** should be less than or equal to **MAX_MODEL_LEN**
+>
+
+2) To pass additional vLLM args for the server bringup, which are not present in `template_vllm_server_*.sh`, pass a (non-vllm) parameter **EXTRA_ARGS** as per the format below:
+
+-e EXTRA_ARGS="space --action-arg1 --action-arg2 --arg-key1 arg-value1 --arg-key2 arg-value2"
+```
+docker run -it --rm \
+    -e http_proxy=$http_proxy -e https_proxy=$https_proxy -e no_proxy=$no_proxy \
+    -e HF_HOME=/mnt/hf_cache \
+    -v /mnt/hf_cache:/mnt/hf_cache \
+    --cap-add=sys_nice \
+    --ipc=host \
+    --runtime=habana \
+    -e HF_TOKEN=YOUR_TOKEN_HERE \
+    -e HABANA_VISIBLE_DEVICES=all \
+    -p 8000:8000 \
+    -e MODEL=meta-llama/Llama-3.1-8B-Instruct \
+	-e EXTRA_ARGS=" --enable-auto-tool-choice --tool-call-parser llama3_json" \
+    --name vllm-server \
+    vllm-v0.7.2-gaudi-ub24:1.21.1-16
+```
+>[!DISCLAIMER]
+>    
+> The provision of **EXTRA_ARGS** param for exporting additional vLLM args is provided only to support user experiments. The additional args exports will not guarantee optimal server performance.
 >

@@ -23,6 +23,11 @@ def prepare_group_list(grouping_string):
     return group_list
 
 def vllm_auto_calc(fd):
+    if "PT_HPU_RECIPE_CACHE_CONFIG" in fd:
+        save_recipe_cache = 1
+    else:
+        save_recipe_cache = 0
+
     if DTYPE == "fp8":
         fd['QUANT_DTYPE'] = 1
         fd['CACHE_DTYPE_BYTES'] = fd['CACHE_DTYPE_BYTES_FP8']
@@ -81,7 +86,7 @@ def vllm_auto_calc(fd):
 
     kv_cache_per_seq_limit = fd['KV_CACHE_PER_SEQ'] * fd['LIMIT_MODEL_LEN'] / fd['MAX_MODEL_LEN']
     fd['KVCACHE_PARALLEL'] = 1 if fd['KV_LORA_RANK'] else min(fd['TENSOR_PARALLEL_SIZE'], fd['NUM_KEY_VALUE_HEADS'])
-    fd['MEM_MAX_NUM_BATCHED_TOKEN'] = ((kv_cache_per_seq_limit if fd['SAVE_RECIPE_CACHE'] else fd['KV_CACHE_PER_SEQ']) /
+    fd['MEM_MAX_NUM_BATCHED_TOKEN'] = ((kv_cache_per_seq_limit if save_recipe_cache else fd['KV_CACHE_PER_SEQ']) /
                                     fd['KVCACHE_PARALLEL'])
     fd['USABLE_MEM'] = ((fd['TOTAL_GPU_MEM'] / fd['TENSOR_PARALLEL_SIZE']) -
                         fd['UNAVAILABLE_MEM_ABS'] -
@@ -230,9 +235,10 @@ def vllm_auto_calc(fd):
     elif hpu_determined == "GAUDI3":
         fd["gnum"]='g3'
 
-    df = pd.DataFrame(list(fd.items()), columns=['Param', 'Value'])
-    pd.set_option('display.max_rows', None)
-    print(df)
+    if int(fd.get('ENTRYPOINT_VERBOSE', 0)): 
+        df = pd.DataFrame(list(fd.items()), columns=['Param', 'Value'])
+        pd.set_option('display.max_rows', None)
+        print(df)
 
     # Create our output list
     with open('varlist_output.txt') as ovp_file:
