@@ -5,6 +5,7 @@ VARS_FILE=server_vars.txt
 OUTPUT_SH=vllm_server.sh
 LOG_DIR="${LOG_DIR:-/root/logs}"
 LOG_FILE=vllm_server.log
+VER="${VER%.*}"
 
 mkdir -p $LOG_DIR
 LOG_FILE=$LOG_DIR/$LOG_FILE
@@ -12,7 +13,7 @@ LOG_FILE=$LOG_DIR/$LOG_FILE
 ## PRE-CHECKS
 HF_HOME="${HF_HOME:-/root/.cache/huggingface}"
 DTYPE="${DTYPE:-bfloat16}"
-export HF_HOME DTYPE
+export HF_HOME DTYPE VER
 
 if [ "$DTYPE" = "fp8" ]; then
 	INPUT_SH=template_vllm_server_fp8.sh
