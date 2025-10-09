@@ -23,8 +23,13 @@ def vllm_auto_calc(fd):
     if DTYPE == "fp8":
         fd['QUANT_DTYPE'] = 1
         fd['CACHE_DTYPE_BYTES'] = fd['CACHE_DTYPE_BYTES_FP8']
-        if os.environ.get('TENSOR_PARALLEL_SIZE') is None:
-            fd['TENSOR_PARALLEL_SIZE'] = fd['TENSOR_PARALLEL_SIZE_FP8']
+        if os.environ.get('MEASUREMENT_TP') is None and os.environ.get('TENSOR_PARALLEL_SIZE') is not None:
+            fd['MEASUREMENT_TP'] = int(os.environ.get('TENSOR_PARALLEL_SIZE'))
+        if os.environ.get('TENSOR_PARALLEL_SIZE') is None and os.environ.get('MEASUREMENT_TP') is not None:
+            fd['TENSOR_PARALLEL_SIZE'] = int(os.environ.get('MEASUREMENT_TP'))
+        if fd['MEASUREMENT_TP'] < fd['TENSOR_PARALLEL_SIZE']:
+            raise ValueError(
+                "Set MEASUREMENT_TP greater than or equal to TENSOR_PARALLEL_SIZE.")
 
     tensor_parallel_size_new = max(1, min(8, fd['TENSOR_PARALLEL_SIZE']))
     if tensor_parallel_size_new != fd['TENSOR_PARALLEL_SIZE']:

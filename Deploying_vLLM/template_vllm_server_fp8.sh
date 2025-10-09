@@ -10,14 +10,14 @@ if [ -f "./measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnu
 	echo "Measurement file found, skipping calibration"
 else
 	cd /root/scripts/vllm_hpu_ext/calibration/
-	echo "RANK is: $RANK"
+	echo "TENSOR_PARALLEL_SIZE is: $TENSOR_PARALLEL_SIZE"
 
-	if [ -n "$RANK" ] && [ "$RANK" != "None" ]; then
+	if [ "$TENSOR_PARALLEL_SIZE" -lt "$MEASUREMENT_TP" ]; then
         	echo -e 'Calibrate model with unification'
-	        ./calibrate_model.sh -m $MODEL -d /root/scripts/dataset-processed.pkl -o /root/scripts/measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum}_${${q}VER} -l 100 -t $TENSOR_PARALLEL_SIZE -r $RANK
+	        ./calibrate_model.sh -m $MODEL -d /root/scripts/dataset-processed.pkl -o /root/scripts/measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum}_${${q}VER} -l 100 -t $MEASUREMENT_TP -r $TENSOR_PARALLEL_SIZE
 	else
         	echo -e 'Calibrate model without unification'
-	        ./calibrate_model.sh -m $MODEL -d /root/scripts/dataset-processed.pkl -o /root/scripts/measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum}_${${q}VER} -l 100 -t $TENSOR_PARALLEL_SIZE 
+	        ./calibrate_model.sh -m $MODEL -d /root/scripts/dataset-processed.pkl -o /root/scripts/measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum}_${${q}VER} -l 100 -t $MEASUREMENT_TP 
 	fi
         cp /root/scripts/measurement/measurement_version.txt /root/scripts/measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum}_${${q}VER}
 fi
@@ -38,7 +38,7 @@ cd /root/scripts
 ## Start vLLM FP8 server  
 QUANT_CONFIG=./measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum}_${${q}VER}/${${q}MODEL_BASE}/maxabs_quant_$gnum.json vllm serve $MODEL \
         --quantization=${${q}QUANTIZATION} \
-        --tensor-parallel-size=$RANK \
+        --tensor-parallel-size=$TENSOR_PARALLEL_SIZE \
         --max-model-len=$MAX_MODEL_LEN \
         --dtype bfloat16 \
         --gpu-memory-utilization $GPU_MEMORY_UTILIZATION \

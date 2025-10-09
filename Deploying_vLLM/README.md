@@ -270,7 +270,7 @@ docker logs -f vllm-server
 bash get_version.sh
 ```
 
-1.2) Run below command to bring up the server
+1.2) Run below command to bring up the server without Unification
 
 ```bash
 docker run -it --rm \
@@ -293,9 +293,33 @@ docker run -it --rm \
 - FP8 inference requires model statistics measurements see [docs.habana.ai - Run Inference using FP8](https://docs.habana.ai/en/latest/PyTorch/Inference_on_PyTorch/Quantization/Inference_Using_FP8.html). In the above example model measurement files are automatically generated and stored inside the container at /root/scripts/measurement.
 - Persistent measurement folder can also be provided, for example by adding docker volume using command line option **-v ./measurement:/root/scripts/measurement** as given in the above example, then statistics measurement will be skipped if measurement file already exists.
 
+1.3) Run below command to bring up the server with Unification.
 > [!NOTE]
-> **fp8 for Vision model and DeepSeek model is not supported**
-> **fp8 for Llama-4 models are WIP**
+> To implement unification, pass the args TENSOR_PARALLEL_SIZE and MEASUREMENT_TP explicitly and ensure that TENSOR_PARALLEL_SIZE is less than MEASUREMENT_TP. MEASUREMENT_TP is the default TP used during the calibration step.
+>  
+
+```bash
+docker run -it --rm \
+    -e http_proxy=$http_proxy -e https_proxy=$https_proxy -e no_proxy=$no_proxy \
+    -e HF_HOME=/mnt/hf_cache \
+    -v /mnt/hf_cache:/mnt/hf_cache \
+    --cap-add=sys_nice \
+    --ipc=host \
+    --runtime=habana \
+    -e HF_TOKEN=YOUR_TOKEN_HERE \
+    -e HABANA_VISIBLE_DEVICES=all \
+    -p 8000:8000 \
+    -e MODEL=meta-llama/Llama-3.1-70B-Instruct \
+    -e DTYPE=fp8 \
+    -e MEASUREMENT_TP=4 \
+	-e TENSOR_PARALLEL_SIZE=2 \
+    --name vllm-server \
+    vllm-v0.9.0.1-gaudi-ub24:1.22.1-6
+```
+
+> [!NOTE]
+> **FP8 for Vision model and DeepSeek model is not supported.**
+> **FP8 for Llama-4 models are WIP**
 >
 
 # Using recipe cache to reduce warmup time(Docker Copy Method)
