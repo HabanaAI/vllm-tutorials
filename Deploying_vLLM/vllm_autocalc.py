@@ -14,14 +14,6 @@ def get_device_model():
     hpu_determined = hthpu.get_device_name()
     return hpu_determined
 
-def prepare_group_list(grouping_string):
-    group_seperator = '--'
-    card_seperator = ','
-    grouping_string = grouping_string.replace(" ", "").strip(group_seperator).strip(card_seperator)
-    group_list=[group.strip(card_seperator).split(card_seperator) for group in grouping_string.split(group_seperator)]
-    print("Card grouping list >> {}".format(group_list))
-    return group_list
-
 def vllm_auto_calc(fd):
     if "PT_HPU_RECIPE_CACHE_CONFIG" in fd:
         save_recipe_cache = 1
@@ -31,32 +23,18 @@ def vllm_auto_calc(fd):
     if DTYPE == "fp8":
         fd['QUANT_DTYPE'] = 1
         fd['CACHE_DTYPE_BYTES'] = fd['CACHE_DTYPE_BYTES_FP8']
-        if os.environ.get('TENSOR_PARALLEL_SIZE') is None:
-            fd['TENSOR_PARALLEL_SIZE'] = fd['TENSOR_PARALLEL_SIZE_FP8']
+        if os.environ.get('MEASUREMENT_TP') is None and os.environ.get('TENSOR_PARALLEL_SIZE') is not None:
+            fd['MEASUREMENT_TP'] = int(os.environ.get('TENSOR_PARALLEL_SIZE'))
+        if os.environ.get('TENSOR_PARALLEL_SIZE') is None and os.environ.get('MEASUREMENT_TP') is not None:
+            fd['TENSOR_PARALLEL_SIZE'] = int(os.environ.get('MEASUREMENT_TP'))
+        if fd['MEASUREMENT_TP'] < fd['TENSOR_PARALLEL_SIZE']:
+            raise ValueError(
+                "Set MEASUREMENT_TP greater than or equal to TENSOR_PARALLEL_SIZE.")
 
     tensor_parallel_size_new = max(1, min(8, fd['TENSOR_PARALLEL_SIZE']))
     if tensor_parallel_size_new != fd['TENSOR_PARALLEL_SIZE']:
         print(f"Clamping TENSOR_PARALLEL_SIZE to {tensor_parallel_size_new}")
     fd['TENSOR_PARALLEL_SIZE'] = tensor_parallel_size_new
-
-    if DTYPE == "fp8":
-        if fd['UNI_GROUPS'] == "\"None\"":
-            fd['MEASUREMENT_TP'] = fd['TENSOR_PARALLEL_SIZE']
-        elif fd['MEASUREMENT_TP'] <= fd['TENSOR_PARALLEL_SIZE']:
-            raise ValueError(
-                "Unification is not \"None\". "
-                "Set correct MEASUREMENT_TP and UNI_GROUPS")
-        else:
-            groups = prepare_group_list(fd['UNI_GROUPS'])
-            mtp = sum(len(cards) for cards in groups)
-            if mtp != fd['MEASUREMENT_TP']:
-                raise ValueError(
-                    f"MEASUREMENT_TP {fd['MEASUREMENT_TP']} not same as total unified cards {mtp}. "
-                    "Set correct MEASUREMENT_TP and UNI_GROUPS")
-            if len(groups) != fd['TENSOR_PARALLEL_SIZE']:
-                raise ValueError(
-                    f"TP {fd['TENSOR_PARALLEL_SIZE']} not same than unified groups {len(groups)}. "
-                    "Set correct TENSOR_PARALLEL_SIZE, MEASUREMENT_TP and UNI_GROUPS")
 
     fd['MAX_MODEL_LEN'] = max(1, fd['MAX_MODEL_LEN'])
 

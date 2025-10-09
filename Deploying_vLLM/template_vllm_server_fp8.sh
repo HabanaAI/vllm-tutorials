@@ -6,20 +6,20 @@ unset VLLM_PROMPT_SEQ_BUCKET_MAX
 MODEL_BASE=$(echo $MODEL | awk -F '/' '{print $2}')
 MODEL_BASE=${${q}MODEL_BASE,,}
 
-if [ -f "./measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum}/${${q}MODEL_BASE}/maxabs_quant_$gnum.json" ]; then
+if [ -f "./measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum}_${${q}VER}/${${q}MODEL_BASE}/maxabs_quant_$gnum.json" ]; then
 	echo "Measurement file found, skipping calibration"
 else
 	cd /root/scripts/vllm_hpu_ext/calibration/
-	echo "UNI_GROUPS is: [$UNI_GROUPS]"
+	echo "TENSOR_PARALLEL_SIZE is: $TENSOR_PARALLEL_SIZE"
 
-	if [ -n "$UNI_GROUPS" ] && [ "$UNI_GROUPS" != "None" ]; then
+	if [ "$TENSOR_PARALLEL_SIZE" -lt "$MEASUREMENT_TP" ]; then
         	echo -e 'Calibrate model with unification'
-	        ./calibrate_model.sh -m $MODEL -d /root/scripts/dataset-processed.pkl -o /root/scripts/measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum} -l 100 -t $MEASUREMENT_TP -g "$UNI_GROUPS"
+	        ./calibrate_model.sh -m $MODEL -d /root/scripts/dataset-processed.pkl -o /root/scripts/measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum}_${${q}VER} -l 100 -t $MEASUREMENT_TP -r $TENSOR_PARALLEL_SIZE
 	else
         	echo -e 'Calibrate model without unification'
-	        ./calibrate_model.sh -m $MODEL -d /root/scripts/dataset-processed.pkl -o /root/scripts/measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum} -l 100 -t $MEASUREMENT_TP 
+	        ./calibrate_model.sh -m $MODEL -d /root/scripts/dataset-processed.pkl -o /root/scripts/measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum}_${${q}VER} -l 100 -t $MEASUREMENT_TP 
 	fi
-        cp /root/scripts/measurement/measurement_version.txt /root/scripts/measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum}
+        cp /root/scripts/measurement/measurement_version.txt /root/scripts/measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum}_${${q}VER}
 fi
 
 QUANTIZATION="inc"
@@ -36,7 +36,7 @@ fi
 
 cd /root/scripts
 ## Start vLLM FP8 server  
-QUANT_CONFIG=./measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum}/${${q}MODEL_BASE}/maxabs_quant_$gnum.json vllm serve $MODEL \
+QUANT_CONFIG=./measurement/${${q}MODEL_BASE}_tp${${q}TENSOR_PARALLEL_SIZE}_${${q}gnum}_${${q}VER}/${${q}MODEL_BASE}/maxabs_quant_$gnum.json vllm serve $MODEL \
         --quantization=${${q}QUANTIZATION} \
         --tensor-parallel-size=$TENSOR_PARALLEL_SIZE \
         --max-model-len=$MAX_MODEL_LEN \

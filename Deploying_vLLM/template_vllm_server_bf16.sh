@@ -4,7 +4,13 @@
 if [ -n "$PT_HPU_RECIPE_CACHE_CONFIG" ]; then # Checks if using recipe cache
     EXTRA_ARGS+=" --num_gpu_blocks_override $NUM_GPU_BLOCKS_OVERRIDE"
 fi
+MODEL_BASE=$(echo $MODEL | awk -F '/' '{print $2}')
+MODEL_BASE=${${q}MODEL_BASE,,}
 
+if [[ ${${q}MODEL_BASE} =~ ^llama-4 ]]; then
+    echo "Running llama-4 extra-args"
+    EXTRA_ARGS+=" --enable-expert-parallel "
+fi
 ## Start server
 python3 -m vllm.entrypoints.openai.api_server \
         --model $MODEL \
