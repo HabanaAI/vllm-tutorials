@@ -9,7 +9,7 @@ MODEL_BASE=${${q}MODEL_BASE,,}
 
 if [[ ${${q}MODEL_BASE} =~ ^llama-4 ]]; then
     echo "Running llama-4 extra-args"
-    EXTRA_ARGS+=" --use-v2-block-manager --enable-expert-parallel "
+    EXTRA_ARGS+=" --enable-expert-parallel "
 fi
 ## Start server
 python3 -m vllm.entrypoints.openai.api_server \
